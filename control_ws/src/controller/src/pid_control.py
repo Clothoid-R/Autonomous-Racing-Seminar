@@ -14,6 +14,8 @@ class PIDController(Node):
         self.cmd_pub = self.create_publisher(Float32, 'car1/linear_vel', 10)
         self.vel_sub = self.create_subscription(Odometry, 'car1/odom', self.odom_callback, 10)
 
+        self.target_vel_sub = self.create_subscription(Float32, 'car1/target_vel', self.target_vel_callback, 10)
+        
         self.target_vel = 1.0
 
         # ================================================

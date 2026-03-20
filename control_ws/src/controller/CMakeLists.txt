@@ -16,8 +16,10 @@ find_package(nav_msgs REQUIRED)
 install(PROGRAMS
   src/pid_control.py
   src/pure_pursuit.py
+  src/supervisor.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights

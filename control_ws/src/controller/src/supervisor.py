@@ -8,6 +8,8 @@ class Supervisor(Node):
     def __init__(self):
         super().__init__('supervisor')
 
+        self.get_logger().info('Supervisor node has been started.')
+
         self.cmd_pub = self.create_publisher(Twist, 'car1/cmd_vel', 10)
         self.linear_sub = self.create_subscription(Float32, 'car1/linear_vel', self.linear_callback, 10)
         self.steering_sub = self.create_subscription(Float32, 'car1/steering_angle', self.steering_callback, 10)
@@ -26,7 +28,7 @@ class Supervisor(Node):
     def control_loop(self):
         cmd_msg = Twist()
         cmd_msg.linear.x = self.linear_vel
-        cmd_msg.angular.z = 0.0  # No steering control in this example
+        cmd_msg.angular.z = self.steering_angle  # No steering control in this example
         self.cmd_pub.publish(cmd_msg)
 
 def main(args=None):
