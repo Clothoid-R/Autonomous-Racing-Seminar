@@ -14,10 +14,12 @@ class PIDController(Node):
         self.cmd_pub = self.create_publisher(Float32, 'car1/linear_vel', 10)
         self.vel_sub = self.create_subscription(Odometry, 'car1/odom', self.odom_callback, 10)
 
-        self.target_vel_sub = self.create_subscription(Float32, 'car1/target_vel', self.target_vel_callback, 10)
+        # self.target_vel_sub = self.create_subscription(Float32, 'car1/target_vel', self.target_vel_callback, 10)
         
-        self.target_vel = 1.0
+        self.target_vel = 2.0  
 
+        # gazebo의 특징으로 인해 pid제어로 하면 자동으로 브레이크가 걸려 물리 엔진이 이상하게 작동하는 문제가 있음
+        # 이를 방지하기 위해 PID 제어는 단순히 목표 속도를 퍼블리시하는 형태로 구현 (실제 PID 계산은 생략)
         # ================================================
         # PID parameters
         self.kp = 1.0
@@ -37,24 +39,28 @@ class PIDController(Node):
         
         error = self.target_vel - current_vel
 
-        # Implement PID control logic here (not fully implemented for simplicity)
         control_signal = self.kp * error
 
         return control_signal
     
     def loop(self):
         control_signal = self.pid_calculate()
-        # Use the control signal to publish velocity commands
+        
         cmd_msg = Float32()
-        cmd_msg.data = control_signal
+        cmd_msg.data = self.target_vel
         self.cmd_pub.publish(cmd_msg)
 
 def main(args=None):
     rclpy.init(args=args)
     pid_controller = PIDController()
-    rclpy.spin(pid_controller)
-    pid_controller.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(pid_controller)
+    except KeyboardInterrupt:
+        pid_controller.target_vel = 0.0
+        pid_controller.loop()
+    finally:
+        pid_controller.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

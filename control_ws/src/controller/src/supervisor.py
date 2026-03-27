@@ -4,6 +4,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Float32
+import math
 class Supervisor(Node):
     def __init__(self):
         super().__init__('supervisor')
@@ -17,7 +18,7 @@ class Supervisor(Node):
 
         self.linear_vel = 0.0
         self.steering_angle = 0.0
-
+        self.wheel_base = 1.0
     def linear_callback(self, msg):
         
         self.linear_vel = msg.data
@@ -28,15 +29,28 @@ class Supervisor(Node):
     def control_loop(self):
         cmd_msg = Twist()
         cmd_msg.linear.x = self.linear_vel
-        cmd_msg.angular.z = self.steering_angle  # No steering control in this example
+
+        if self.linear_vel != 0:
+            angular_z = self.linear_vel * math.tan(self.steering_angle) / self.wheel_base
+        else:
+            angular_z = 0.0
+        cmd_msg.angular.z = angular_z  # No steering control in this example
         self.cmd_pub.publish(cmd_msg)
 
 def main(args=None):
     rclpy.init(args=args)
     supervisor = Supervisor()
-    rclpy.spin(supervisor)
-    supervisor.destroy_node()
-    rclpy.shutdown()
+    try:
+        rclpy.spin(supervisor)
+    except KeyboardInterrupt:
+        cmd_msg = Twist()
+        cmd_msg.linear.x = 0.0
+
+        cmd_msg.angular.z = 0.0  # No steering control in this example
+        supervisor.cmd_pub.publish(cmd_msg)
+    finally:
+        supervisor.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
