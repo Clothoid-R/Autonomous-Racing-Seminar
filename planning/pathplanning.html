@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>경로 계획 알고리즘 시각화 — A* & Dijkstra</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0e0f14;
+    --surface: #16181f;
+    --surface2: #1e2029;
+    --border: #2a2d3a;
+    --text: #e8eaf0;
+    --muted: #6b7080;
+    --accent: #7f77dd;
+    --accent2: #1d9e75;
+    --accent3: #d85a30;
+    --open: #e0a020;
+    --closed: #2a5a8a;
+    --path: #7f77dd;
+    --path2: #c04070;
+    --wall: #2a2d3a;
+    --empty: #1e2029;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Noto Sans KR', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+  header {
+    padding: 1.5rem 2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: baseline; gap: 1rem;
+  }
+  header h1 { font-family: var(--mono); font-size: 1.1rem; font-weight: 600; color: var(--accent); letter-spacing: -0.02em; }
+  header span { font-size: 0.8rem; color: var(--muted); }
+
+  .main { display: flex; gap: 0; height: calc(100vh - 60px); }
+
+  .sidebar {
+    width: 220px; flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 1.2rem 1rem;
+    display: flex; flex-direction: column; gap: 1rem;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-family: var(--mono); font-size: 0.65rem; font-weight: 600;
+    color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase;
+    margin-bottom: 0.4rem;
+  }
+
+  .mode-btns { display: flex; flex-direction: column; gap: 5px; }
+  .mode-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--muted); padding: 7px 10px; border-radius: 6px;
+    font-family: var(--mono); font-size: 0.72rem; cursor: pointer;
+    text-align: left; transition: all 0.15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .mode-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mode-btn.active { border-color: var(--accent); background: rgba(127,119,221,0.12); color: var(--accent); }
+  .mode-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 7px 10px; border-radius: 6px;
+    font-family: var(--mono); font-size: 0.72rem; cursor: pointer;
+    outline: none;
+  }
+  select:focus { border-color: var(--accent); }
+
+  .speed-wrap { display: flex; flex-direction: column; gap: 5px; }
+  .speed-row { display: flex; justify-content: space-between; align-items: center; }
+  .speed-val { font-family: var(--mono); font-size: 0.7rem; color: var(--accent); }
+  input[type=range] {
+    width: 100%; accent-color: var(--accent); cursor: pointer;
+    height: 3px;
+  }
+
+  .run-btn {
+    width: 100%; padding: 10px; border-radius: 6px;
+    background: var(--accent); border: none; color: #fff;
+    font-family: var(--mono); font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s;
+    letter-spacing: 0.05em;
+  }
+  .run-btn:hover { opacity: 0.85; }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .clear-btn {
+    width: 100%; padding: 8px; border-radius: 6px;
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    font-family: var(--mono); font-size: 0.72rem; cursor: pointer; transition: all 0.15s;
+  }
+  .clear-btn:hover { border-color: var(--accent3); color: var(--accent3); }
+
+  .stats-block { background: var(--surface2); border-radius: 8px; padding: 10px 12px; }
+  .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.72rem; }
+  .stat-row:last-child { margin-bottom: 0; }
+  .stat-key { color: var(--muted); font-family: var(--mono); }
+  .stat-val { color: var(--text); font-family: var(--mono); font-weight: 600; }
+
+  .legend-block { display: flex; flex-direction: column; gap: 5px; }
+  .leg-row { display: flex; align-items: center; gap: 8px; font-size: 0.7rem; color: var(--muted); }
+  .leg-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  .canvas-area {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    background: var(--bg); padding: 1.5rem;
+    overflow: auto;
+  }
+
+  canvas {
+    cursor: crosshair;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    image-rendering: pixelated;
+  }
+
+  .info-bar {
+    position: fixed; bottom: 0; left: 220px; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 8px 1.5rem; font-family: var(--mono); font-size: 0.7rem;
+    color: var(--muted); display: flex; gap: 2rem;
+  }
+  .info-item span { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>path_planning.viz</h1>
+  <span>A* & Dijkstra 인터랙티브 시각화 — 자율주행 판단 파트 세미나</span>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div>
+      <div class="section-label">그리기 모드</div>
+      <div class="mode-btns">
+        <button class="mode-btn active" id="btn-wall" onclick="setMode('wall')">
+          <div class="leg-dot" style="background:#444"></div> 장애물
+        </button>
+        <button class="mode-btn" id="btn-start" onclick="setMode('start')">
+          <div class="leg-dot" style="background:var(--accent2)"></div> 출발점 S
+        </button>
+        <button class="mode-btn" id="btn-end" onclick="setMode('end')">
+          <div class="leg-dot" style="background:var(--accent3)"></div> 목적지 E
+        </button>
+        <button class="mode-btn" id="btn-erase" onclick="setMode('erase')">
+          <div class="leg-dot" style="background:var(--surface2);border:1px solid var(--border)"></div> 지우개
+        </button>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">알고리즘</div>
+      <select id="algo-select" onchange="onAlgoChange()">
+        <option value="astar">A* (휴리스틱 ON)</option>
+        <option value="dijkstra">Dijkstra (휴리스틱 OFF)</option>
+        <option value="both">A* vs Dijkstra 비교</option>
+      </select>
+    </div>
+
+    <div id="heuristic-block">
+      <div class="section-label">휴리스틱 종류</div>
+      <select id="h-type" onchange="onHTypeChange()">
+        <option value="manhattan">맨해튼 거리</option>
+        <option value="euclidean">유클리드 거리</option>
+        <option value="chebyshev">체비쇼프 거리</option>
+        <option value="weighted">Weighted A* (w × h)</option>
+      </select>
+    </div>
+
+    <div id="weight-block" style="display:none;">
+      <div class="speed-wrap">
+        <div class="section-label">가중치 w</div>
+        <div class="speed-row">
+          <span style="font-size:0.68rem;color:var(--muted)">w=1 (최적)</span>
+          <span class="speed-val" id="w-out">w = 1.0</span>
+          <span style="font-size:0.68rem;color:var(--muted)">w=5 (빠름)</span>
+        </div>
+        <input type="range" id="w-slider" min="1" max="5" value="1" step="0.5"
+          oninput="document.getElementById('w-out').textContent='w = '+parseFloat(this.value).toFixed(1)">
+        <div style="font-size:0.65rem;color:var(--muted);margin-top:4px;line-height:1.5;">
+          w>1이면 탐색은 빠르지만<br>최적 경로를 보장하지 않음
+        </div>
+      </div>
+    </div>
+
+    <div class="speed-wrap">
+      <div class="section-label">탐색 속도</div>
+      <div class="speed-row">
+        <span style="font-size:0.68rem;color:var(--muted)">느림</span>
+        <span class="speed-val" id="speed-out">중간</span>
+        <span style="font-size:0.68rem;color:var(--muted)">빠름</span>
+      </div>
+      <input type="range" id="speed" min="1" max="5" value="3" step="1"
+        oninput="document.getElementById('speed-out').textContent=speedLabels[this.value-1]">
+    </div>
+
+    <button class="run-btn" id="run-btn" onclick="runAlgo()">▶  탐색 시작</button>
+    <button class="clear-btn" onclick="clearAll()">초기화</button>
+
+    <div>
+      <div class="section-label">결과</div>
+      <div class="stats-block">
+        <div class="stat-row"><span class="stat-key">알고리즘</span><span class="stat-val" id="s-algo">—</span></div>
+        <div class="stat-row"><span class="stat-key">휴리스틱</span><span class="stat-val" id="s-htype">—</span></div>
+        <div class="stat-row"><span class="stat-key">탐색 셀</span><span class="stat-val" id="s-explored">—</span></div>
+        <div class="stat-row"><span class="stat-key">경로 길이</span><span class="stat-val" id="s-path">—</span></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">범례</div>
+      <div class="legend-block">
+        <div class="leg-row"><div class="leg-dot" style="background:var(--accent2)"></div> 출발점</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--accent3)"></div> 목적지</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#444"></div> 장애물</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--open)"></div> Open (후보)</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--closed)"></div> Closed (탐색됨)</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--path)"></div> A* 경로</div>
+        <div class="leg-row"><div class="leg-dot" style="background:var(--path2)"></div> Dijkstra 경로</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="canvas-area">
+    <canvas id="grid"></canvas>
+  </div>
+</div>
+
+<div class="info-bar">
+  <div>f(n) = g(n) + <span id="info-formula" style="color:var(--accent)">h(n)</span></div>
+  <div id="info-hdesc" style="color:var(--muted)">h = 맨해튼 거리</div>
+  <div><span style="color:var(--accent)">Dijkstra</span>: h = 0 (균등 탐색)</div>
+  <div>클릭/드래그로 장애물 그리기</div>
+</div>
+
+<script>
+const COLS = 25, ROWS = 25;
+const CELL = 22;
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+canvas.width = COLS * CELL;
+canvas.height = ROWS * CELL;
+
+const speedLabels = ['아주 느리게','느리게','중간','빠르게','최고속도'];
+const speedDelays = [150, 60, 25, 10, 2];
+
+let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+let start = {r:2, c:2};
+let end = {r:22, c:22};
+let mode = 'wall';
+let isDrawing = false;
+let animRunning = false;
+
+const C = {
+  bg:      '#1e2029',
+  wall:    '#2a2d3a',
+  start:   '#1d9e75',
+  end:     '#d85a30',
+  open:    '#e0a020',
+  closed:  '#2a5a8a',
+  path:    '#7f77dd',
+  path2:   '#c04070',
+  closed2: '#1a4060',
+  grid:    '#252830',
+};
+
+function setMode(m) {
+  mode = m;
+  ['wall','start','end','erase'].forEach(x =>
+    document.getElementById('btn-'+x).classList.toggle('active', x===m));
+}
+
+function cellAt(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const x = (e.clientX - rect.left) * scaleX;
+  const y = (e.clientY - rect.top) * scaleY;
+  const c = Math.floor(x / CELL), r = Math.floor(y / CELL);
+  if (r<0||r>=ROWS||c<0||c>=COLS) return null;
+  return {r, c};
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (animRunning) return;
+  isDrawing = true;
+  handle(cellAt(e));
+});
+canvas.addEventListener('mousemove', e => {
+  if (!isDrawing || animRunning) return;
+  const cell = cellAt(e);
+  if (cell && mode === 'wall') { grid[cell.r][cell.c] = 1; draw(); }
+  if (cell && mode === 'erase') { grid[cell.r][cell.c] = 0; draw(); }
+});
+canvas.addEventListener('mouseup', () => isDrawing = false);
+canvas.addEventListener('mouseleave', () => isDrawing = false);
+
+function handle(cell) {
+  if (!cell) return;
+  if (mode === 'start') { start = cell; draw(); }
+  else if (mode === 'end') { end = cell; draw(); }
+  else if (mode === 'wall') { grid[cell.r][cell.c] = 1; draw(); }
+  else if (mode === 'erase') { grid[cell.r][cell.c] = 0; draw(); }
+}
+
+function drawCell(r, c, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+}
+
+function draw(visited=[], openSet=[], path=[], visited2=[], path2=[]) {
+  ctx.fillStyle = '#0e0f14';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let r=0; r<ROWS; r++) {
+    for (let c=0; c<COLS; c++) {
+      let color = C.bg;
+      if (grid[r][c]) color = C.wall;
+      if (visited2.some(n=>n.r===r&&n.c===c)) color = C.closed2;
+      if (visited.some(n=>n.r===r&&n.c===c)) color = C.closed;
+      if (openSet.some(n=>n.r===r&&n.c===c)) color = C.open;
+      if (path2.some(n=>n.r===r&&n.c===c)) color = C.path2;
+      if (path.some(n=>n.r===r&&n.c===c)) color = C.path;
+      if (r===start.r&&c===start.c) color = C.start;
+      if (r===end.r&&c===end.c) color = C.end;
+      drawCell(r, c, color);
+    }
+  }
+
+  ctx.strokeStyle = '#252830';
+  ctx.lineWidth = 0.5;
+  for (let r=0; r<=ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(0,r*CELL); ctx.lineTo(COLS*CELL,r*CELL); ctx.stroke();
+  }
+  for (let c=0; c<=COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(c*CELL,0); ctx.lineTo(c*CELL,ROWS*CELL); ctx.stroke();
+  }
+
+  ctx.font = `bold ${Math.floor(CELL*0.5)}px JetBrains Mono, monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText('S', start.c*CELL+CELL/2, start.r*CELL+CELL/2);
+  ctx.fillText('E', end.c*CELL+CELL/2, end.r*CELL+CELL/2);
+}
+
+function onAlgoChange() {
+  const algo = document.getElementById('algo-select').value;
+  document.getElementById('heuristic-block').style.display = algo === 'dijkstra' ? 'none' : '';
+  const htype = document.getElementById('h-type').value;
+  document.getElementById('weight-block').style.display =
+    (algo !== 'dijkstra' && htype === 'weighted') ? '' : 'none';
+}
+
+function onHTypeChange() {
+  const htype = document.getElementById('h-type').value;
+  const algo = document.getElementById('algo-select').value;
+  document.getElementById('weight-block').style.display =
+    (htype === 'weighted' && algo !== 'dijkstra') ? '' : 'none';
+  const descs = {
+    manhattan: 'h = 맨해튼 거리 (|Δr|+|Δc|)',
+    euclidean: 'h = 유클리드 거리 (√(Δr²+Δc²))',
+    chebyshev: 'h = 체비쇼프 거리 (max(|Δr|,|Δc|))',
+    weighted:  'h = w × 맨해튼 거리 (Weighted A*)',
+  };
+  document.getElementById('info-hdesc').textContent = descs[htype] || '';
+}
+
+function heuristic(a, b) {
+  const htype = document.getElementById('h-type').value;
+  const dr = Math.abs(a.r - b.r), dc = Math.abs(a.c - b.c);
+  if (htype === 'euclidean') return Math.sqrt(dr*dr + dc*dc);
+  if (htype === 'chebyshev') return Math.max(dr, dc);
+  if (htype === 'weighted') {
+    const w = parseFloat(document.getElementById('w-slider').value);
+    return w * (dr + dc);
+  }
+  return dr + dc; // manhattan (default)
+}
+
+function neighbors(node) {
+  return [[-1,0],[1,0],[0,-1],[0,1]]
+    .map(([dr,dc]) => ({r:node.r+dr, c:node.c+dc}))
+    .filter(n => n.r>=0&&n.r<ROWS&&n.c>=0&&n.c<COLS&&!grid[n.r][n.c]);
+}
+
+function key(n) { return n.r+','+n.c; }
+
+function buildPath(cameFrom, current) {
+  const path = [current];
+  while (cameFrom[key(current)]) { current = cameFrom[key(current)]; path.unshift(current); }
+  return path;
+}
+
+async function search(useH) {
+  let open = [{node: start, f:0, g:0}];
+  let cameFrom = {};
+  let gScore = {[key(start)]: 0};
+  let closed = [];
+  let steps = [];
+
+  while (open.length > 0) {
+    open.sort((a,b) => a.f - b.f);
+    const {node: curr} = open.shift();
+    if (curr.r===end.r&&curr.c===end.c) {
+      steps.push({closed:[...closed], open:open.map(x=>x.node), path:buildPath(cameFrom,curr)});
+      return steps;
+    }
+    closed.push(curr);
+    steps.push({closed:[...closed], open:open.map(x=>x.node), path:[]});
+    for (const nb of neighbors(curr)) {
+      if (closed.some(x=>x.r===nb.r&&x.c===nb.c)) continue;
+      const tentG = (gScore[key(curr)]||0) + 1;
+      if (tentG < (gScore[key(nb)]||Infinity)) {
+        cameFrom[key(nb)] = curr;
+        gScore[key(nb)] = tentG;
+        const h = useH ? heuristic(nb, end) : 0;
+        const existing = open.find(x=>x.node.r===nb.r&&x.node.c===nb.c);
+        if (existing) { existing.f = tentG+h; existing.g = tentG; }
+        else open.push({node:nb, f:tentG+h, g:tentG});
+      }
+    }
+  }
+  steps.push({closed, open:[], path:[], noPath:true});
+  return steps;
+}
+
+async function runAlgo() {
+  if (animRunning) return;
+  animRunning = true;
+  document.getElementById('run-btn').disabled = true;
+  const algo = document.getElementById('algo-select').value;
+  const delay = speedDelays[document.getElementById('speed').value - 1];
+  const htype = document.getElementById('h-type').value;
+  const htypeNames = {manhattan:'맨해튼', euclidean:'유클리드', chebyshev:'체비쇼프', weighted:'Weighted(w='+parseFloat(document.getElementById('w-slider').value).toFixed(1)+')'};
+
+  document.getElementById('s-algo').textContent =
+    algo==='both' ? 'A* vs Dijkstra' : algo==='astar' ? 'A*' : 'Dijkstra';
+  document.getElementById('s-htype').textContent =
+    algo==='dijkstra' ? 'h=0 (없음)' : htypeNames[htype] || htype;
+  document.getElementById('s-explored').textContent = '탐색 중...';
+  document.getElementById('s-path').textContent = '—';
+
+  draw();
+
+  if (algo === 'both') {
+    const [stepsA, stepsD] = await Promise.all([search(true), search(false)]);
+    const maxLen = Math.max(stepsA.length, stepsD.length);
+    for (let i=0; i<maxLen; i++) {
+      const sa = stepsA[Math.min(i,stepsA.length-1)];
+      const sd = stepsD[Math.min(i,stepsD.length-1)];
+      draw(sa.closed, sa.open, sa.path, sd.closed, sd.path);
+      await sleep(delay);
+    }
+    const la = stepsA[stepsA.length-1], ld = stepsD[stepsD.length-1];
+    document.getElementById('s-explored').textContent = `A*:${la.closed.length} / D:${ld.closed.length}`;
+    document.getElementById('s-path').textContent = la.path.length ? `${la.path.length}칸 (동일)` : '경로 없음';
+  } else {
+    const steps = await search(algo === 'astar');
+    for (const step of steps) {
+      draw(step.closed, step.open, step.path);
+      await sleep(delay);
+    }
+    const last = steps[steps.length-1];
+    document.getElementById('s-explored').textContent = last.closed.length + '개';
+    document.getElementById('s-path').textContent = last.path.length ? last.path.length + '칸' : '경로 없음';
+  }
+
+  animRunning = false;
+  document.getElementById('run-btn').disabled = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function clearAll() {
+  if (animRunning) return;
+  grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+  draw();
+  document.getElementById('s-algo').textContent = '—';
+  document.getElementById('s-htype').textContent = '—';
+  document.getElementById('s-explored').textContent = '—';
+  document.getElementById('s-path').textContent = '—';
+}
+
+draw();
+</script>
+</body>
+</html>
