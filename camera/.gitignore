@@ -1,0 +1,3 @@
+# Ignore Ultralytics egg-info and dataset folder
+/yolov12/yolov12/ulralytics.egg-info/
+/yolov12/dataset/
